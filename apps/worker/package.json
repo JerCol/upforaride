@@ -1,0 +1,9 @@
+{
+  "name": "up-for-a-ride-worker",
+  "version": "1.0.0",
+  "private": true,
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240512.0",
+    "typescript": "^5.4.0"
+  }
+}

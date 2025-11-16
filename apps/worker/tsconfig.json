@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "ES2020",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "jsx": "react-jsx",
+    "types": ["@cloudflare/workers-types"],
+    "lib": ["ES2021", "DOM"],
+    "outDir": "dist"
+  },
+  "include": ["worker.ts"]
+}
