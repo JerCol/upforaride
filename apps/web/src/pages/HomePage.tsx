@@ -27,7 +27,7 @@ export function HomePage() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1>UP for a ride</h1>
+        <h1>🚗 UP for a ride 🚗</h1>
       </header>
 
       {notification && (
