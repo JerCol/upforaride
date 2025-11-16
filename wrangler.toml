@@ -1,0 +1,11 @@
+name = "up-for-a-ride"
+compatibility_date = "2024-09-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "up-for-a-ride"
+database_id = "d55a8f57-b9cf-415d-8ced-b372ce6ba896"
+
+# If you use Pages Functions, also:
+[vars]
+# any runtime env vars
