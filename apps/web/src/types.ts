@@ -46,7 +46,7 @@ export interface State {
 
 // For now: hardcoded users
 export const USERS: User[] = [
-  { id: "alice", name: "Alice" },
-  { id: "bob", name: "Bob" },
-  { id: "charlie", name: "Charlie" },
+  { id: "jeroen", name: "Jeroen" },
+  { id: "stijn", name: "Stijn" },
+  { id: "Silke", name: "Silke" },
 ];
