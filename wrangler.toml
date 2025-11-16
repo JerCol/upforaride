@@ -1,19 +1,14 @@
-name = "up-for-a-ride"
+name = "up-for-a-ride-worker"
+main = "apps/worker/worker.ts"
 compatibility_date = "2024-05-01"
 
-# ENTRY POINT for Worker
-main = "apps/worker/worker.ts"
-
-# Cloudflare Pages functions support
-pages_build_output_dir = "apps/web/dist"
-
-# Bind D1
+# D1 binding
 [[d1_databases]]
 binding = "DB"
 database_name = "up_for_a_ride_db"
-database_id = "YOUR_D1_ID"
+database_id = "7a37a2c9-5548-483c-9527-845dc79d08c4"
 
-# Route API calls to worker
-[[routes]]
-pattern = "https://your-domain.com/api/*"
-zone_id = "YOUR_ZONE_ID"
+# Optional: dev settings
+[dev]
+port = 8787
+local_protocol = "http"

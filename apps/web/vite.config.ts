@@ -1,7 +1,7 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from "vite";
 
-// https://vite.dev/config/
+// Minimal Vite config without React plugin.
+// React still works because Vite uses esbuild to handle TSX/JSX.
 export default defineConfig({
-  plugins: [react()],
-})
+  plugins: [],
+});
