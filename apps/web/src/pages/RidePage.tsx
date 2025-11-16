@@ -181,7 +181,7 @@ export function RidePage() {
 
         <label className="field">
           <span className="field-label">
-            {mode === "start" ? "Start km (odometer)" : "End km (odometer)"}
+            {mode === "start" ? "Start km" : "End km"}
           </span>
           <input
             type="number"

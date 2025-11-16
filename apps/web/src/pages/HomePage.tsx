@@ -27,8 +27,7 @@ export function HomePage() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1>up-for-a-ride</h1>
-        <p className="subtitle">Shared VW Up – simple cost sharing</p>
+        <h1>UP for a ride</h1>
       </header>
 
       {notification && (
@@ -50,7 +49,7 @@ export function HomePage() {
             <PrimaryButton>Stop ride</PrimaryButton>
           </Link>
           <Link to="/cost">
-            <PrimaryButton>Add fuel / insurance</PrimaryButton>
+            <PrimaryButton>Add cost</PrimaryButton>
           </Link>
           <Link to="/settle">
             <PrimaryButton>Settle-up overview</PrimaryButton>
