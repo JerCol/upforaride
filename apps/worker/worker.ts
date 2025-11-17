@@ -14,7 +14,10 @@ interface Ride {
   endKm: number | null;
   startedAt: string;
   endedAt: string | null;
+  endLat?: number | null;  
+  endLng?: number | null;  
 }
+
 
 interface CostEvent {
   id: string;
@@ -100,8 +103,9 @@ export default {
 
 async function handleState(env: Env): Promise<Response> {
   const ridesRes = await env.DB.prepare(
-    "SELECT id, userId, startKm, endKm, startedAt, endedAt FROM rides"
+    "SELECT id, userId, startKm, endKm, startedAt, endedAt, endLat, endLng FROM rides"
   ).all<Ride>();
+  
 
   const costsRes = await env.DB.prepare(
     "SELECT id, userId, amount, type, description, createdAt FROM costs"
@@ -161,10 +165,12 @@ async function handleUpdateRide(
     endKm?: number | null;
     startedAt: string;
     endedAt?: string | null;
+    endLat?: number | null;   // 👈 new
+    endLng?: number | null;   // 👈 new
   };
 
   await env.DB.prepare(
-    "UPDATE rides SET userId = ?, startKm = ?, endKm = ?, startedAt = ?, endedAt = ? WHERE id = ?"
+    "UPDATE rides SET userId = ?, startKm = ?, endKm = ?, startedAt = ?, endedAt = ?, endLat = ?, endLng = ? WHERE id = ?"
   )
     .bind(
       body.userId,
@@ -172,12 +178,15 @@ async function handleUpdateRide(
       body.endKm ?? null,
       body.startedAt,
       body.endedAt ?? null,
+      body.endLat ?? null,     // 👈 new
+      body.endLng ?? null,     // 👈 new
       id
     )
     .run();
 
   return json({ ok: true });
 }
+
 
 async function handleCreateCost(
   request: Request,

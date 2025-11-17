@@ -10,10 +10,13 @@ export interface Ride {
   id: string;
   userId: UserId;
   startKm: number;
-  endKm?: number;
-  startedAt: string; // ISO
-  endedAt?: string;  // ISO
+  endKm: number | null;
+  startedAt: string;
+  endedAt: string | null;
+  endLat?: number | null;  
+  endLng?: number | null;  
 }
+
 
 export type CostType = "FUEL" | "INSURANCE" | "OTHER";
 

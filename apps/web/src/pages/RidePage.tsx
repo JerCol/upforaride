@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { USERS } from "../types";
-import type { UserId } from "../types";
+import { USERS, type UserId, type Ride } from "../types";
 import { store } from "../dataStore";
 import { UserPicker } from "../components/UserPicker";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Card } from "../components/Card";
 import { InlineNotification } from "../components/InlineNotification";
 import { OdometerScanner } from "../components/OdometerScanner";
-
 
 type Mode = "start" | "stop";
 
@@ -19,14 +17,13 @@ export function RidePage() {
   const preUserId = searchParams.get("userId") || undefined;
 
   const [userId, setUserId] = useState<UserId | undefined>(
-    preUserId ?? USERS[0]?.id
+    (preUserId as UserId | undefined) ?? USERS[0]?.id
   );
   const [km, setKm] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
   const [state, setState] = useState(store.getState());
   const [scannerOpen, setScannerOpen] = useState(false);
-
 
   useEffect(() => {
     const unsubscribe = store.subscribe(setState);
@@ -88,21 +85,29 @@ export function RidePage() {
           return;
         }
 
-        const closed = {
+        const closed: Ride = {
           ...lastRide,
           endKm: kmValue,
           endedAt: new Date().toISOString(),
+          endLat: lastRide.endLat ?? null,
+          endLng: lastRide.endLng ?? null,
         };
         store.updateRide(closed);
       }
 
       const rideId = crypto.randomUUID();
-      store.addRide({
+      const newRide: Ride = {
         id: rideId,
         userId,
         startKm: kmValue,
         startedAt: new Date().toISOString(),
-      });
+        endKm: null,
+        endedAt: null,
+        endLat: null,
+        endLng: null,
+      };
+
+      store.addRide(newRide);
 
       navigate("/", {
         state: {
@@ -125,20 +130,56 @@ export function RidePage() {
         );
         return;
       }
-      store.updateRide({
-        ...open,
-        endKm: kmValue,
-        endedAt: new Date().toISOString(),
-      });
 
-      navigate("/", {
-        state: {
-          notification: {
-            type: "success",
-            message: `Ride stopped. Distance: ${kmValue - open.startKm} km.`,
+      const finalizeStop = (coords?: GeolocationCoordinates | null) => {
+        const updatedRide: Ride = {
+          ...open,
+          endKm: kmValue,
+          endedAt: new Date().toISOString(),
+          endLat: coords
+            ? coords.latitude
+            : open.endLat ?? null,
+          endLng: coords
+            ? coords.longitude
+            : open.endLng ?? null,
+        };
+
+        store.updateRide(updatedRide);
+
+        navigate("/", {
+          state: {
+            notification: {
+              type: "success",
+              message: `Ride stopped. Distance: ${
+                kmValue - open.startKm
+              } km.`,
+            },
           },
-        },
-      });
+        });
+      };
+
+      // 👉 Here we "offer" to save location when stopping
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            // User allowed / success: store car location
+            finalizeStop(pos.coords);
+          },
+          (err) => {
+            console.error("Geolocation error on stop:", err);
+            // Permission denied or error: still stop ride, just without new location
+            finalizeStop(null);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 8000,
+            maximumAge: 0,
+          }
+        );
+      } else {
+        // Browser does not support geolocation → just stop ride
+        finalizeStop(null);
+      }
     }
   }
 
@@ -172,7 +213,10 @@ export function RidePage() {
                 ride starting at km <strong>{lastRide.startKm}</strong>. <br />
                 By entering the <strong>current km</strong> and starting your
                 ride, you will{" "}
-                <strong>stop their ride and start a new one for you</strong>.
+                <strong>
+                  stop their ride and start a new one for you
+                </strong>
+                .
               </>
             ) : (
               <>
@@ -195,7 +239,6 @@ export function RidePage() {
               value={km}
               onChange={(e) => setKm(e.target.value)}
             />
-            
             <button
               type="button"
               className="scanner-button-secondary"
@@ -204,10 +247,8 @@ export function RidePage() {
             >
               📷 Scan
             </button>
-            
           </div>
         </label>
-
 
         {mode === "start" && lastKnownKm !== undefined && (
           <p className="hint">
@@ -217,7 +258,8 @@ export function RidePage() {
 
         {mode === "stop" && openRideForUser && (
           <p className="hint">
-            This ride started at km <strong>{openRideForUser.startKm}</strong>.
+            This ride started at km{" "}
+            <strong>{openRideForUser.startKm}</strong>.
           </p>
         )}
 
@@ -225,6 +267,7 @@ export function RidePage() {
           {mode === "start" ? "Start ride" : "Stop ride"}
         </PrimaryButton>
       </Card>
+
       <OdometerScanner
         isOpen={scannerOpen}
         onClose={() => setScannerOpen(false)}
@@ -232,7 +275,6 @@ export function RidePage() {
           setKm(String(value));
         }}
       />
-
     </div>
   );
 }

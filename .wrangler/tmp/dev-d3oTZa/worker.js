@@ -75,7 +75,7 @@ var worker_default = {
 };
 async function handleState(env) {
   const ridesRes = await env.DB.prepare(
-    "SELECT id, userId, startKm, endKm, startedAt, endedAt FROM rides"
+    "SELECT id, userId, startKm, endKm, startedAt, endedAt, endLat, endLng FROM rides"
   ).all();
   const costsRes = await env.DB.prepare(
     "SELECT id, userId, amount, type, description, createdAt FROM costs"
@@ -110,13 +110,17 @@ __name(handleCreateRide, "handleCreateRide");
 async function handleUpdateRide(request, env, id) {
   const body = await request.json();
   await env.DB.prepare(
-    "UPDATE rides SET userId = ?, startKm = ?, endKm = ?, startedAt = ?, endedAt = ? WHERE id = ?"
+    "UPDATE rides SET userId = ?, startKm = ?, endKm = ?, startedAt = ?, endedAt = ?, endLat = ?, endLng = ? WHERE id = ?"
   ).bind(
     body.userId,
     body.startKm,
     body.endKm ?? null,
     body.startedAt,
     body.endedAt ?? null,
+    body.endLat ?? null,
+    // 👈 new
+    body.endLng ?? null,
+    // 👈 new
     id
   ).run();
   return json({ ok: true });

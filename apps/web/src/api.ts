@@ -48,9 +48,12 @@ export const api = {
         endKm: ride.endKm ?? null,
         startedAt: ride.startedAt,
         endedAt: ride.endedAt ?? null,
+        endLat: ride.endLat ?? null,   // 👈
+        endLng: ride.endLng ?? null,   // 👈
       }),
     });
   },
+  
 
   createCost(cost: CostEvent): Promise<{ ok: true }> {
     return apiFetch<{ ok: true }>("/api/costs", {
