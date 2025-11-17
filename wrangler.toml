@@ -8,6 +8,9 @@ binding = "DB"
 database_name = "up_for_a_ride_db"
 database_id = "7a37a2c9-5548-483c-9527-845dc79d08c4"
 
+[vars]
+OCR_SPACE_API_KEY = "YK82567465988957"
+
 # Optional: dev settings
 [dev]
 port = 8787

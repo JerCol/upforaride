@@ -1,10 +1,12 @@
 // src/api.ts
 import type { State, Ride, CostEvent, WearPayment } from "./types";
 
-// If your Worker is on the same domain under /api, leave this empty string.
-// If it's another hostname, put that base URL here (e.g. "https://api.example.com").
-const API_BASE = import.meta.env.VITE_API_BASE || "";
+// Base URL for the API.
+// In production: set VITE_API_BASE to your worker, e.g. https://up-for-a-ride-worker.jeroen-colon.workers.dev
+// In local dev with wrangler dev: VITE_API_BASE=http://127.0.0.1:8787
+export const API_BASE = import.meta.env.VITE_API_BASE || "";
 
+// Small helper to call the API with JSON
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: {

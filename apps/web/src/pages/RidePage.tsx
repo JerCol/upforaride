@@ -7,6 +7,8 @@ import { UserPicker } from "../components/UserPicker";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Card } from "../components/Card";
 import { InlineNotification } from "../components/InlineNotification";
+import { OdometerScanner } from "../components/OdometerScanner";
+
 
 type Mode = "start" | "stop";
 
@@ -23,6 +25,8 @@ export function RidePage() {
   const [error, setError] = useState<string | null>(null);
 
   const [state, setState] = useState(store.getState());
+  const [scannerOpen, setScannerOpen] = useState(false);
+
 
   useEffect(() => {
     const unsubscribe = store.subscribe(setState);
@@ -181,15 +185,29 @@ export function RidePage() {
 
         <label className="field">
           <span className="field-label">
-            {mode === "start" ? "Start km" : "End km"}
+            {mode === "start" ? "Start km (odometer)" : "End km (odometer)"}
           </span>
-          <input
-            type="number"
-            className="field-input"
-            value={km}
-            onChange={(e) => setKm(e.target.value)}
-          />
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              type="number"
+              className="field-input"
+              style={{ flex: 1 }}
+              value={km}
+              onChange={(e) => setKm(e.target.value)}
+            />
+            {mode === "start" && (
+              <button
+                type="button"
+                className="scanner-button-secondary"
+                onClick={() => setScannerOpen(true)}
+                style={{ whiteSpace: "nowrap" }}
+              >
+                📷 Scan
+              </button>
+            )}
+          </div>
         </label>
+
 
         {mode === "start" && lastKnownKm !== undefined && (
           <p className="hint">
@@ -207,6 +225,14 @@ export function RidePage() {
           {mode === "start" ? "Start ride" : "Stop ride"}
         </PrimaryButton>
       </Card>
+      <OdometerScanner
+        isOpen={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onValueDetected={(value) => {
+          setKm(String(value));
+        }}
+      />
+
     </div>
   );
 }

@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// .wrangler/tmp/bundle-vtih3B/checked-fetch.js
+// .wrangler/tmp/bundle-W5Gyf4/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -52,6 +52,8 @@ var worker_default = {
         response = await handleCreateCost(request, env);
       } else if (request.method === "POST" && path === "/api/wear-payments") {
         response = await handleCreateWearPayment(request, env);
+      } else if (request.method === "POST" && path === "/api/odometer-ocr") {
+        response = await handleOdometerOcr(request, env);
       } else {
         response = new Response("Not found", { status: 404 });
       }
@@ -71,49 +73,44 @@ var worker_default = {
     });
   }
 };
-function makeCorsHeaders(origin) {
-  return {
-    // Allow all origins; change to your Pages domain if you want to lock it down
-    "Access-Control-Allow-Origin": origin === "null" ? "*" : origin,
-    "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Max-Age": "86400"
-  };
-}
-__name(makeCorsHeaders, "makeCorsHeaders");
 async function handleState(env) {
-  const rides = await env.DB.prepare(
-    "SELECT * FROM rides"
+  const ridesRes = await env.DB.prepare(
+    "SELECT id, userId, startKm, endKm, startedAt, endedAt FROM rides"
   ).all();
-  const costs = await env.DB.prepare(
-    "SELECT * FROM costs"
+  const costsRes = await env.DB.prepare(
+    "SELECT id, userId, amount, type, description, createdAt FROM costs"
   ).all();
-  const wearPayments = await env.DB.prepare(
-    "SELECT * FROM wear_payments"
+  const wearRes = await env.DB.prepare(
+    "SELECT id, userId, amount, createdAt FROM wear_payments"
   ).all();
-  const cfg = await env.DB.prepare("SELECT value FROM config WHERE key='wearRatePerKm'").all();
-  const configRow = cfg.results?.[0];
-  const wearRatePerKm = configRow ? Number(configRow.value) : 0.2;
-  return json({
-    rides: rides.results ?? [],
-    costs: costs.results ?? [],
-    wearPayments: wearPayments.results ?? [],
-    config: { wearRatePerKm }
-  });
+  const cfgRes = await env.DB.prepare(
+    "SELECT value FROM config WHERE key = 'wearRatePerKm'"
+  ).all();
+  const cfgRow = cfgRes.results && cfgRes.results[0];
+  const wearRatePerKm = cfgRow ? Number(cfgRow.value) : 0.2;
+  const state = {
+    rides: ridesRes.results ?? [],
+    costs: costsRes.results ?? [],
+    wearPayments: wearRes.results ?? [],
+    config: {
+      wearRatePerKm
+    }
+  };
+  return json(state);
 }
 __name(handleState, "handleState");
-async function handleCreateRide(req, env) {
-  const body = await req.json();
+async function handleCreateRide(request, env) {
+  const body = await request.json();
   await env.DB.prepare(
     "INSERT INTO rides (id, userId, startKm, startedAt) VALUES (?, ?, ?, ?)"
   ).bind(body.id, body.userId, body.startKm, body.startedAt).run();
   return json({ ok: true });
 }
 __name(handleCreateRide, "handleCreateRide");
-async function handleUpdateRide(req, env, id) {
-  const body = await req.json();
+async function handleUpdateRide(request, env, id) {
+  const body = await request.json();
   await env.DB.prepare(
-    "UPDATE rides SET userId=?, startKm=?, endKm=?, startedAt=?, endedAt=? WHERE id=?"
+    "UPDATE rides SET userId = ?, startKm = ?, endKm = ?, startedAt = ?, endedAt = ? WHERE id = ?"
   ).bind(
     body.userId,
     body.startKm,
@@ -125,8 +122,8 @@ async function handleUpdateRide(req, env, id) {
   return json({ ok: true });
 }
 __name(handleUpdateRide, "handleUpdateRide");
-async function handleCreateCost(req, env) {
-  const body = await req.json();
+async function handleCreateCost(request, env) {
+  const body = await request.json();
   await env.DB.prepare(
     "INSERT INTO costs (id, userId, amount, type, description, createdAt) VALUES (?, ?, ?, ?, ?, ?)"
   ).bind(
@@ -140,21 +137,94 @@ async function handleCreateCost(req, env) {
   return json({ ok: true });
 }
 __name(handleCreateCost, "handleCreateCost");
-async function handleCreateWearPayment(req, env) {
-  const body = await req.json();
+async function handleCreateWearPayment(request, env) {
+  const body = await request.json();
   await env.DB.prepare(
     "INSERT INTO wear_payments (id, userId, amount, createdAt) VALUES (?, ?, ?, ?)"
   ).bind(body.id, body.userId, body.amount, body.createdAt).run();
   return json({ ok: true });
 }
 __name(handleCreateWearPayment, "handleCreateWearPayment");
-function json(data, init = {}) {
-  return new Response(JSON.stringify(data), {
-    ...init,
+async function handleOdometerOcr(request, env) {
+  const body = await request.json();
+  if (!body.imageData) {
+    return json({ error: "imageData missing" }, { status: 400 });
+  }
+  const apiKey = env.OCR_SPACE_API_KEY;
+  if (!apiKey) {
+    return json(
+      { error: "OCR API key not configured on server" },
+      { status: 500 }
+    );
+  }
+  const form = new FormData();
+  form.append(
+    "base64Image",
+    `data:image/jpeg;base64,${body.imageData}`
+  );
+  form.append("language", "eng");
+  form.append("isOverlayRequired", "false");
+  form.append("OCREngine", "2");
+  const ocrRes = await fetch("https://api.ocr.space/parse/image", {
+    method: "POST",
+    headers: {
+      apikey: apiKey
+    },
+    body: form
+  });
+  if (!ocrRes.ok) {
+    const txt = await ocrRes.text();
+    console.error("OCR.Space error:", ocrRes.status, txt);
+    return json(
+      { error: "OCR API call failed", status: ocrRes.status },
+      { status: 502 }
+    );
+  }
+  const ocrJson = await ocrRes.json();
+  const parsed = ocrJson.ParsedResults?.[0];
+  const fullText = parsed?.ParsedText || "";
+  if (!fullText) {
+    return json(
+      { value: null, rawText: "", digitsOnly: "", message: "No text detected" },
+      { status: 200 }
+    );
+  }
+  const digitsOnly = fullText.replace(/\D/g, "");
+  let candidate = null;
+  if (digitsOnly.length >= 4 && digitsOnly.length <= 7) {
+    candidate = digitsOnly;
+  } else if (digitsOnly.length > 7) {
+    candidate = digitsOnly.slice(-7);
+  } else if (digitsOnly.length > 0) {
+    candidate = digitsOnly;
+  }
+  const value = candidate && Number.isFinite(Number(candidate)) ? Number(candidate) : null;
+  return json(
+    {
+      value,
+      rawText: fullText,
+      digitsOnly
+    },
+    { status: 200 }
+  );
+}
+__name(handleOdometerOcr, "handleOdometerOcr");
+function makeCorsHeaders(origin) {
+  return {
+    "Access-Control-Allow-Origin": origin === "null" ? "*" : origin,
+    "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Max-Age": "86400"
+  };
+}
+__name(makeCorsHeaders, "makeCorsHeaders");
+function json(body, init) {
+  return new Response(JSON.stringify(body), {
     headers: {
       "Content-Type": "application/json",
-      ...init.headers || {}
-    }
+      ...init?.headers || {}
+    },
+    ...init
   });
 }
 __name(json, "json");
@@ -200,7 +270,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// .wrangler/tmp/bundle-vtih3B/middleware-insertion-facade.js
+// .wrangler/tmp/bundle-W5Gyf4/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -232,7 +302,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// .wrangler/tmp/bundle-vtih3B/middleware-loader.entry.ts
+// .wrangler/tmp/bundle-W5Gyf4/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;

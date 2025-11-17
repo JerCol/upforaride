@@ -2,6 +2,7 @@
 
 export interface Env {
   DB: D1Database;
+  OCR_SPACE_API_KEY: string;
 }
 
 type CostType = "FUEL" | "INSURANCE" | "OTHER";
@@ -31,13 +32,15 @@ interface WearPayment {
   createdAt: string;
 }
 
+interface AppConfig {
+  wearRatePerKm: number;
+}
+
 interface State {
   rides: Ride[];
   costs: CostEvent[];
   wearPayments: WearPayment[];
-  config: {
-    wearRatePerKm: number;
-  };
+  config: AppConfig;
 }
 
 export default {
@@ -46,7 +49,7 @@ export default {
     const path = url.pathname;
     const origin = request.headers.get("Origin") || "*";
 
-    // 1. CORS preflight
+    // CORS preflight
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
@@ -54,7 +57,6 @@ export default {
       });
     }
 
-    // 2. Actual routing
     let response: Response;
 
     try {
@@ -62,19 +64,15 @@ export default {
         response = await handleState(env);
       } else if (request.method === "POST" && path === "/api/rides") {
         response = await handleCreateRide(request, env);
-      } else if (
-        request.method === "PUT" &&
-        path.startsWith("/api/rides/")
-      ) {
+      } else if (request.method === "PUT" && path.startsWith("/api/rides/")) {
         const id = path.split("/").pop()!;
         response = await handleUpdateRide(request, env, id);
       } else if (request.method === "POST" && path === "/api/costs") {
         response = await handleCreateCost(request, env);
-      } else if (
-        request.method === "POST" &&
-        path === "/api/wear-payments"
-      ) {
+      } else if (request.method === "POST" && path === "/api/wear-payments") {
         response = await handleCreateWearPayment(request, env);
+      } else if (request.method === "POST" && path === "/api/odometer-ocr") {
+        response = await handleOdometerOcr(request, env);
       } else {
         response = new Response("Not found", { status: 404 });
       }
@@ -83,7 +81,7 @@ export default {
       response = new Response("Internal Server Error", { status: 500 });
     }
 
-    // 3. Attach CORS headers to all responses
+    // Attach CORS headers
     const headers = new Headers(response.headers);
     const cors = makeCorsHeaders(origin);
     for (const [k, v] of Object.entries(cors)) {
@@ -98,49 +96,45 @@ export default {
   },
 };
 
-function makeCorsHeaders(origin: string): Record<string, string> {
-  return {
-    // Allow all origins; change to your Pages domain if you want to lock it down
-    "Access-Control-Allow-Origin": origin === "null" ? "*" : origin,
-    "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Max-Age": "86400",
-  };
-}
-
-
-// ----------------- HANDLERS -----------------
+// ---------- ROUTE HANDLERS ----------
 
 async function handleState(env: Env): Promise<Response> {
-  const rides = await env.DB.prepare(
-    "SELECT * FROM rides"
+  const ridesRes = await env.DB.prepare(
+    "SELECT id, userId, startKm, endKm, startedAt, endedAt FROM rides"
   ).all<Ride>();
 
-  const costs = await env.DB.prepare(
-    "SELECT * FROM costs"
+  const costsRes = await env.DB.prepare(
+    "SELECT id, userId, amount, type, description, createdAt FROM costs"
   ).all<CostEvent>();
 
-  const wearPayments = await env.DB.prepare(
-    "SELECT * FROM wear_payments"
+  const wearRes = await env.DB.prepare(
+    "SELECT id, userId, amount, createdAt FROM wear_payments"
   ).all<WearPayment>();
 
-  const cfg = await env.DB
-    .prepare("SELECT value FROM config WHERE key='wearRatePerKm'")
-    .all();
+  const cfgRes = await env.DB.prepare(
+    "SELECT value FROM config WHERE key = 'wearRatePerKm'"
+  ).all();
 
-  const configRow = cfg.results?.[0] as { value: string } | undefined;
-  const wearRatePerKm = configRow ? Number(configRow.value) : 0.2;
+  const cfgRow = (cfgRes.results && cfgRes.results[0]) as
+    | { value: string }
+    | undefined;
 
-  return json({
-    rides: rides.results ?? [],
-    costs: costs.results ?? [],
-    wearPayments: wearPayments.results ?? [],
-    config: { wearRatePerKm }
-  });
+  const wearRatePerKm = cfgRow ? Number(cfgRow.value) : 0.2;
+
+  const state: State = {
+    rides: (ridesRes.results as Ride[]) ?? [],
+    costs: (costsRes.results as CostEvent[]) ?? [],
+    wearPayments: (wearRes.results as WearPayment[]) ?? [],
+    config: {
+      wearRatePerKm,
+    },
+  };
+
+  return json(state);
 }
 
-async function handleCreateRide(req: Request, env: Env): Promise<Response> {
-  const body = (await req.json()) as {
+async function handleCreateRide(request: Request, env: Env): Promise<Response> {
+  const body = (await request.json()) as {
     id: string;
     userId: string;
     startKm: number;
@@ -157,14 +151,20 @@ async function handleCreateRide(req: Request, env: Env): Promise<Response> {
 }
 
 async function handleUpdateRide(
-  req: Request,
+  request: Request,
   env: Env,
   id: string
 ): Promise<Response> {
-  const body = (await req.json()) as any;
+  const body = (await request.json()) as {
+    userId: string;
+    startKm: number;
+    endKm?: number | null;
+    startedAt: string;
+    endedAt?: string | null;
+  };
 
   await env.DB.prepare(
-    "UPDATE rides SET userId=?, startKm=?, endKm=?, startedAt=?, endedAt=? WHERE id=?"
+    "UPDATE rides SET userId = ?, startKm = ?, endKm = ?, startedAt = ?, endedAt = ? WHERE id = ?"
   )
     .bind(
       body.userId,
@@ -179,8 +179,18 @@ async function handleUpdateRide(
   return json({ ok: true });
 }
 
-async function handleCreateCost(req: Request, env: Env): Promise<Response> {
-  const body = (await req.json()) as CostEvent;
+async function handleCreateCost(
+  request: Request,
+  env: Env
+): Promise<Response> {
+  const body = (await request.json()) as {
+    id: string;
+    userId: string;
+    amount: number;
+    type: CostType;
+    description?: string;
+    createdAt: string;
+  };
 
   await env.DB.prepare(
     "INSERT INTO costs (id, userId, amount, type, description, createdAt) VALUES (?, ?, ?, ?, ?, ?)"
@@ -199,10 +209,15 @@ async function handleCreateCost(req: Request, env: Env): Promise<Response> {
 }
 
 async function handleCreateWearPayment(
-  req: Request,
+  request: Request,
   env: Env
 ): Promise<Response> {
-  const body = (await req.json()) as WearPayment;
+  const body = (await request.json()) as {
+    id: string;
+    userId: string;
+    amount: number;
+    createdAt: string;
+  };
 
   await env.DB.prepare(
     "INSERT INTO wear_payments (id, userId, amount, createdAt) VALUES (?, ?, ?, ?)"
@@ -213,14 +228,107 @@ async function handleCreateWearPayment(
   return json({ ok: true });
 }
 
-// ----------------- UTIL -----------------
+async function handleOdometerOcr(
+  request: Request,
+  env: Env
+): Promise<Response> {
+  const body = (await request.json()) as {
+    imageData?: string; // base64 (WITHOUT data: prefix)
+  };
 
-function json(data: unknown, init: ResponseInit = {}): Response {
-  return new Response(JSON.stringify(data), {
-    ...init,
+  if (!body.imageData) {
+    return json({ error: "imageData missing" }, { status: 400 });
+  }
+
+  const apiKey = env.OCR_SPACE_API_KEY;
+  if (!apiKey) {
+    return json(
+      { error: "OCR API key not configured on server" },
+      { status: 500 }
+    );
+  }
+
+  // Build POST form for OCR.Space
+  const form = new FormData();
+  form.append(
+    "base64Image",
+    `data:image/jpeg;base64,${body.imageData}`
+  );
+  form.append("language", "eng");
+  form.append("isOverlayRequired", "false");
+  form.append("OCREngine", "2");
+
+  const ocrRes = await fetch("https://api.ocr.space/parse/image", {
+    method: "POST",
+    headers: {
+      apikey: apiKey,
+    },
+    body: form,
+  });
+
+  if (!ocrRes.ok) {
+    const txt = await ocrRes.text();
+    console.error("OCR.Space error:", ocrRes.status, txt);
+    return json(
+      { error: "OCR API call failed", status: ocrRes.status },
+      { status: 502 }
+    );
+  }
+
+  const ocrJson = (await ocrRes.json()) as any;
+  const parsed = ocrJson.ParsedResults?.[0];
+  const fullText: string = parsed?.ParsedText || "";
+
+  if (!fullText) {
+    return json(
+      { value: null, rawText: "", digitsOnly: "", message: "No text detected" },
+      { status: 200 }
+    );
+  }
+
+  const digitsOnly = fullText.replace(/\D/g, "");
+
+  let candidate: string | null = null;
+  if (digitsOnly.length >= 4 && digitsOnly.length <= 7) {
+    candidate = digitsOnly;
+  } else if (digitsOnly.length > 7) {
+    candidate = digitsOnly.slice(-7);
+  } else if (digitsOnly.length > 0) {
+    candidate = digitsOnly;
+  }
+
+  const value =
+    candidate && Number.isFinite(Number(candidate))
+      ? Number(candidate)
+      : null;
+
+  return json(
+    {
+      value,
+      rawText: fullText,
+      digitsOnly,
+    },
+    { status: 200 }
+  );
+}
+
+// ---------- HELPERS ----------
+
+function makeCorsHeaders(origin: string): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin": origin === "null" ? "*" : origin,
+    "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Max-Age": "86400",
+  };
+}
+
+function json(body: unknown, init?: ResponseInit): Response {
+  return new Response(JSON.stringify(body), {
     headers: {
       "Content-Type": "application/json",
-      ...(init.headers || {})
-    }
+      ...(init?.headers || {}),
+    },
+    ...init,
   });
 }

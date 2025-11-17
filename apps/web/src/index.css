@@ -225,3 +225,92 @@ a {
   padding: 0 4px;
   line-height: 1;
 }
+
+.scanner-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.75);
+  display: flex;
+  justify-content: center;
+  align-items: flex-end; /* bottom sheet instead of full center */
+  z-index: 50;
+  padding: 0 12px;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+}
+
+.scanner-dialog {
+  background: #0f172a;
+  color: #e5e7eb;
+  border-radius: 18px;
+  padding: 16px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 75vh;      /* keep it above Safari UI */
+  overflow: hidden;       /* no overflow outside the sheet */
+}
+
+.scanner-instruction {
+  font-size: 0.85rem;
+  color: #cbd5f5;
+  margin: 0;
+}
+
+.scanner-video-wrapper {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #020617;
+  max-height: 50vh;       /* avoid going too tall */
+}
+
+.scanner-video {
+  width: 100%;
+  display: block;
+}
+
+.scanner-overlay {
+  position: absolute;
+  inset: 0;
+  box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.4);
+  border: 2px dashed #38bdf8;
+  margin: 12%;
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+.scanner-error {
+  color: #fecaca;
+  font-size: 0.85rem;
+  margin: 4px 0 0;
+}
+
+.scanner-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.scanner-button-primary,
+.scanner-button-secondary {
+  border-radius: 999px;
+  padding: 8px 14px;
+  border: none;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.scanner-button-primary {
+  background: #22c55e;
+  color: #022c22;
+  font-weight: 600;
+}
+
+.scanner-button-secondary {
+  background: #1f2937;
+  color: #e5e7eb;
+}
