@@ -51,5 +51,7 @@ export interface State {
 export const USERS: User[] = [
   { id: "jeroen", name: "Jeroen" },
   { id: "stijn", name: "Stijn" },
-  { id: "Silke", name: "Silke" },
+  { id: "silke", name: "Silke" },
+  { id: "hanne", name: "Hanne" },
+  { id: "hella", name: "Hella" },
 ];
