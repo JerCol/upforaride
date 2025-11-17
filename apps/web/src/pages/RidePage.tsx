@@ -195,16 +195,16 @@ export function RidePage() {
               value={km}
               onChange={(e) => setKm(e.target.value)}
             />
-            {mode === "start" && (
-              <button
-                type="button"
-                className="scanner-button-secondary"
-                onClick={() => setScannerOpen(true)}
-                style={{ whiteSpace: "nowrap" }}
-              >
-                📷 Scan
-              </button>
-            )}
+            
+            <button
+              type="button"
+              className="scanner-button-secondary"
+              onClick={() => setScannerOpen(true)}
+              style={{ whiteSpace: "nowrap" }}
+            >
+              📷 Scan
+            </button>
+            
           </div>
         </label>
 
