@@ -5,6 +5,7 @@ import { Card } from "../components/Card";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { InlineNotification } from "../components/InlineNotification";
 import { store } from "../dataStore";
+import { PageHeader } from "../components/PageHeader"; 
 
 interface NavNotification {
   type: "success" | "error" | "info";
@@ -48,9 +49,8 @@ export function HomePage() {
 
   return (
     <div className="page">
-      <header className="page-header">
-        <h1>🚗 UP for a ride 🚗</h1>
-      </header>
+       <PageHeader title="🚗 UP for a ride 🚗" />   {/* 👈 instead of plain <header> */}
+
 
       {lastWithLocation && (
   <section className="card">

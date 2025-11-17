@@ -7,6 +7,8 @@ import { UserPicker } from "../components/UserPicker";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Card } from "../components/Card";
 import { InlineNotification } from "../components/InlineNotification";
+import { PageHeader } from "../components/PageHeader";
+
 
 export function CostPage() {
   const navigate = useNavigate();
@@ -56,9 +58,7 @@ export function CostPage() {
 
   return (
     <div className="page">
-      <header className="page-header">
-        <h1>Add fuel / insurance</h1>
-      </header>
+      <PageHeader title="Add cost" />
 
       {error && (
         <InlineNotification type="error" onClose={() => setError(null)}>

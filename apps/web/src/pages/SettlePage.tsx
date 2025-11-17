@@ -3,6 +3,8 @@ import { store } from "../dataStore";
 import { USERS } from "../types";
 import type { UserId } from "../types";
 import { Card } from "../components/Card";
+import { PageHeader } from "../components/PageHeader";
+
 
 interface UserSummary {
   userId: UserId;
@@ -88,12 +90,7 @@ export function SettlePage() {
 
   return (
     <div className="page">
-      <header className="page-header">
-        <h1>Settle-up overview</h1>
-        <p className="subtitle">
-          Who used the car how much, and who owes what.
-        </p>
-      </header>
+      <PageHeader title="Settle-up overview" />
 
       {summaries.map((s) => (
         <Card key={s.userId}>

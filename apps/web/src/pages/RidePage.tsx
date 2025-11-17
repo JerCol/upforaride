@@ -7,6 +7,8 @@ import { PrimaryButton } from "../components/PrimaryButton";
 import { Card } from "../components/Card";
 import { InlineNotification } from "../components/InlineNotification";
 import { OdometerScanner } from "../components/OdometerScanner";
+import { PageHeader } from "../components/PageHeader";
+
 
 type Mode = "start" | "stop";
 
@@ -187,15 +189,13 @@ export function RidePage() {
 
   return (
     <div className="page">
-      <header className="page-header">
-        <h1>{title}</h1>
-      </header>
+      <PageHeader title={title} />   {/* 👈 replaces <header className="page-header">... */}
 
-      {error && (
-        <InlineNotification type="error" onClose={() => setError(null)}>
-          {error}
-        </InlineNotification>
-      )}
+    {error && (
+      <InlineNotification type="error" onClose={() => setError(null)}>
+        {error}
+      </InlineNotification>
+    )}
 
       <Card>
         <UserPicker

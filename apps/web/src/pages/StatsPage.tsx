@@ -6,6 +6,8 @@ import type { UserId } from "../types";
 import { Card } from "../components/Card";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { InlineNotification } from "../components/InlineNotification";
+import { PageHeader } from "../components/PageHeader";
+
 
 export function StatsPage() {
   const { userId } = useParams<{ userId: string }>();
@@ -128,10 +130,7 @@ export function StatsPage() {
 
   return (
     <div className="page">
-      <header className="page-header">
-        <h1>{user.name}</h1>
-        <p className="subtitle">Personal statistics</p>
-      </header>
+      <PageHeader title="Statistieken" />
 
       {error && (
         <InlineNotification type="error" onClose={() => setError(null)}>
