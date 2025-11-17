@@ -138,7 +138,6 @@ export function OdometerScanner({
     try {
       const video = videoRef.current;
   
-      const canvas = document.createElement("canvas");
       const w = video.videoWidth;
       const h = video.videoHeight;
   
@@ -148,12 +147,15 @@ export function OdometerScanner({
         return;
       }
   
-      // Simple crop: middle horizontal band where digits likely are
-      const roiHeight = h * 0.3;
-      const roiY = h * 0.35;
+      // ✅ Draw the FULL frame, but downscale to keep size reasonable
+      const maxWidth = 1024; // good compromise for mobile
+      const scale = w > maxWidth ? maxWidth / w : 1;
+      const targetWidth = Math.round(w * scale);
+      const targetHeight = Math.round(h * scale);
   
-      canvas.width = w;
-      canvas.height = roiHeight;
+      const canvas = document.createElement("canvas");
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
   
       const ctx = canvas.getContext("2d");
       if (!ctx) {
@@ -162,7 +164,17 @@ export function OdometerScanner({
         return;
       }
   
-      ctx.drawImage(video, 0, roiY, w, roiHeight, 0, 0, w, roiHeight);
+      ctx.drawImage(
+        video,
+        0,
+        0,
+        w,
+        h,
+        0,
+        0,
+        targetWidth,
+        targetHeight
+      );
   
       // Convert to JPEG blob
       const blob: Blob = await new Promise((resolve, reject) => {
@@ -223,6 +235,7 @@ export function OdometerScanner({
       setIsProcessing(false);
     }
   }
+  
   
 
   if (!isOpen) return null;
