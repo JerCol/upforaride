@@ -287,6 +287,13 @@ export function RidePage() {
               📷 Scan
             </button>
           </div>
+          <OdometerScanner
+        isOpen={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onValueDetected={(value) => {
+          setKm(String(value));
+        }}
+      />
         </label>
 
         {mode === "start" && lastKnownKm !== undefined && (
@@ -300,13 +307,7 @@ export function RidePage() {
         </PrimaryButton>
       </Card>
 
-      <OdometerScanner
-        isOpen={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-        onValueDetected={(value) => {
-          setKm(String(value));
-        }}
-      />
+     
     </div>
   );
 }
