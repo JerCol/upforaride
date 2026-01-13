@@ -1,10 +1,13 @@
 CREATE TABLE IF NOT EXISTS rides (
   id TEXT PRIMARY KEY,
   userId TEXT NOT NULL,
+  participantIds TEXT NOT NULL, -- JSON array string e.g. ["jeroen","stijn"]
   startKm INTEGER NOT NULL,
   endKm INTEGER,
   startedAt TEXT NOT NULL,
-  endedAt TEXT
+  endedAt TEXT,
+  endLat REAL,
+  endLng REAL
 );
 
 CREATE TABLE IF NOT EXISTS costs (
