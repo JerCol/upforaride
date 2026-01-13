@@ -8,13 +8,14 @@ export interface User {
 
 export interface Ride {
   id: string;
-  userId: UserId;
+  userId: UserId; // keep as "driver/creator" if you want, or optional later
+  participantIds: UserId[]; // ✅ new
   startKm: number;
   endKm: number | null;
   startedAt: string;
   endedAt: string | null;
-  endLat?: number | null;  
-  endLng?: number | null;  
+  endLat?: number | null;
+  endLng?: number | null;
 }
 
 

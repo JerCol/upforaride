@@ -27,29 +27,30 @@ export const api = {
     return apiFetch<State>("/api/state");
   },
 
-  createRide(ride: Ride): Promise<{ ok: true }> {
-    return apiFetch<{ ok: true }>("/api/rides", {
+  async createRide(ride: Ride) {
+    return apiFetch<{ ok: true }>(`/api/rides`, {
       method: "POST",
       body: JSON.stringify({
         id: ride.id,
         userId: ride.userId,
+        participantIds: ride.participantIds, // ✅ IMPORTANT
         startKm: ride.startKm,
         startedAt: ride.startedAt,
       }),
     });
   },
-
-  updateRide(ride: Ride): Promise<{ ok: true }> {
+  async updateRide(ride: Ride) {
     return apiFetch<{ ok: true }>(`/api/rides/${ride.id}`, {
       method: "PUT",
       body: JSON.stringify({
         userId: ride.userId,
+        participantIds: ride.participantIds, // ✅ IMPORTANT
         startKm: ride.startKm,
         endKm: ride.endKm ?? null,
         startedAt: ride.startedAt,
         endedAt: ride.endedAt ?? null,
-        endLat: ride.endLat ?? null,   // 👈
-        endLng: ride.endLng ?? null,   // 👈
+        endLat: ride.endLat ?? null,
+        endLng: ride.endLng ?? null,
       }),
     });
   },

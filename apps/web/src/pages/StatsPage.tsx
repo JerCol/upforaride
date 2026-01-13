@@ -7,7 +7,7 @@ import { Card } from "../components/Card";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { InlineNotification } from "../components/InlineNotification";
 import { PageHeader } from "../components/PageHeader";
-
+import { computeKmByUser } from "../utils/rideShares";
 
 export function StatsPage() {
   const { userId } = useParams<{ userId: string }>();
@@ -24,14 +24,8 @@ export function StatsPage() {
   const user = USERS.find((u) => u.id === userId);
 
   const totalKmByUser = useMemo(() => {
-    const map: Record<UserId, number> = {};
-    for (const r of state.rides) {
-      if (r.endKm == null) continue;
-      const d = r.endKm - r.startKm;
-      if (d <= 0) continue;
-      map[r.userId] = (map[r.userId] || 0) + d;
-    }
-    return map;
+    const allIds = USERS.map((u) => u.id);
+    return computeKmByUser(state.rides, allIds);
   }, [state.rides]);
 
   const totalKmOverall = useMemo(() => {
@@ -43,8 +37,7 @@ export function StatsPage() {
     [state.costs]
   );
 
-  const kmUser =
-    userId && (totalKmByUser[userId as UserId] || 0);
+  const kmUser = userId ? totalKmByUser[userId as UserId] ?? 0 : 0;
 
   const variablePaidByUser = useMemo(
     () =>
@@ -57,13 +50,12 @@ export function StatsPage() {
   );
 
   const fairShare =
-    totalKmOverall > 0
-      ? (totalVariableCosts * (kmUser || 0)) / totalKmOverall
-      : 0;
+    totalKmOverall > 0 ? (totalVariableCosts * kmUser) / totalKmOverall : 0;
 
   const netVariable = variablePaidByUser - fairShare;
 
-  const wearOwed = (kmUser || 0) * state.config.wearRatePerKm;
+  // Wear is also based on km share (km split among participants)
+  const wearOwed = kmUser * state.config.wearRatePerKm;
 
   const wearPaidByUser = useMemo(
     () =>
@@ -80,9 +72,7 @@ export function StatsPage() {
   if (!user || !userId) {
     return (
       <div className="page">
-        <header className="page-header">
-          <h1>User not found</h1>
-        </header>
+        <PageHeader title="User not found" />
       </div>
     );
   }
@@ -90,39 +80,37 @@ export function StatsPage() {
   function handleAddWearPayment() {
     setError(null);
 
-    // Extra runtime safety + makes TS happy:
     if (!userId || !user) {
-        setError("User missing or not found.");
-        return;
+      setError("User missing or not found.");
+      return;
     }
 
     const value = Number(wearAmount);
     if (!wearAmount || Number.isNaN(value) || value <= 0) {
-        setError("Enter a valid amount.");
-        return;
+      setError("Enter a valid amount.");
+      return;
     }
 
     const paymentId = crypto.randomUUID();
     store.addWearPayment({
-        id: paymentId,
-        userId: userId as UserId,
-        amount: value,
-        createdAt: new Date().toISOString(),
+      id: paymentId,
+      userId: userId as UserId,
+      amount: value,
+      createdAt: new Date().toISOString(),
     });
     setWearAmount("");
 
     navigate("/", {
-        state: {
+      state: {
         notification: {
-            type: "success",
-            message: `Wear payment of €${value.toFixed(
-            2
-            )} recorded for ${user.name}.`,
+          type: "success",
+          message: `Wear payment of €${value.toFixed(2)} recorded for ${
+            user.name
+          }.`,
         },
-        },
+      },
     });
-    }
-
+  }
 
   function formatAmount(n: number): string {
     return n.toFixed(2);
@@ -142,7 +130,7 @@ export function StatsPage() {
         <h2>Usage</h2>
         <div className="stat-row">
           <span>Total km driven</span>
-          <strong>{kmUser || 0} km</strong>
+          <strong>{kmUser.toFixed(2)} km</strong>
         </div>
       </Card>
 

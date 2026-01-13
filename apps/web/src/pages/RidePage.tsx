@@ -9,7 +9,6 @@ import { InlineNotification } from "../components/InlineNotification";
 import { OdometerScanner } from "../components/OdometerScanner";
 import { PageHeader } from "../components/PageHeader";
 
-
 type Mode = "start" | "stop";
 
 export function RidePage() {
@@ -18,14 +17,30 @@ export function RidePage() {
   const mode = (searchParams.get("mode") || "start") as Mode;
   const preUserId = searchParams.get("userId") || undefined;
 
+  // "Started by" user (driver/initiator) - used when starting only
   const [userId, setUserId] = useState<UserId | undefined>(
     (preUserId as UserId | undefined) ?? USERS[0]?.id
   );
+
   const [km, setKm] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
   const [state, setState] = useState(store.getState());
   const [scannerOpen, setScannerOpen] = useState(false);
+
+  // Participants (multi select) - start mode only
+  const [participantIds, setParticipantIds] = useState<UserId[]>(() =>
+    userId ? [userId] : []
+  );
+
+  // Keep the starter included by default
+  useEffect(() => {
+    if (mode !== "start") return;
+    if (userId && !participantIds.includes(userId)) {
+      setParticipantIds((prev) => [userId, ...prev]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, mode]);
 
   useEffect(() => {
     const unsubscribe = store.subscribe(setState);
@@ -43,33 +58,24 @@ export function RidePage() {
   const lastKnownKm =
     lastRide?.endKm ?? (lastRide ? lastRide.startKm : undefined) ?? 0;
 
-  // Prefill start-km once when loading
+  // Prefill km in start mode
   useEffect(() => {
     if (mode === "start" && km === "" && lastKnownKm != null) {
       setKm(String(lastKnownKm));
     }
   }, [mode, lastKnownKm, km]);
 
-  const openRideForUser = useMemo(() => {
-    if (!userId) return undefined;
-    return state.rides
-      .filter((r) => r.userId === userId && r.endKm == null)
+  // Current open ride: the most recent ride without endKm
+  const openRide = useMemo(() => {
+    return [...state.rides]
+      .filter((r) => r.endKm == null)
       .sort(
-        (a, b) =>
-          new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+        (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
       )[0];
-  }, [state.rides, userId]);
+  }, [state.rides]);
 
-  const lastRideUser =
-    lastRide && USERS.find((u) => u.id === lastRide.userId);
-
-  function handleSubmit() {
+  async function handleSubmit() {
     setError(null);
-
-    if (!userId) {
-      setError("Select a user.");
-      return;
-    }
 
     const kmValue = Number(km);
     if (!km || Number.isNaN(kmValue) || kmValue <= 0) {
@@ -78,29 +84,40 @@ export function RidePage() {
     }
 
     if (mode === "start") {
-      // If previous ride has no endKm, close it with this km
-      if (lastRide && lastRide.endKm == null) {
-        if (kmValue <= lastRide.startKm) {
+      if (!userId) {
+        setError("Select who starts the ride.");
+        return;
+      }
+
+      if (!participantIds.length) {
+        setError("Select at least 1 participant.");
+        return;
+      }
+
+      // If there is already an open ride, close it with this km (no location here)
+      if (openRide) {
+        if (kmValue <= openRide.startKm) {
           setError(
-            `Current km must be greater than the open ride's start km (${lastRide.startKm}).`
+            `Current km must be greater than the open ride's start km (${openRide.startKm}).`
           );
           return;
         }
 
         const closed: Ride = {
-          ...lastRide,
+          ...openRide,
           endKm: kmValue,
           endedAt: new Date().toISOString(),
-          endLat: lastRide.endLat ?? null,
-          endLng: lastRide.endLng ?? null,
+          endLat: openRide.endLat ?? null,
+          endLng: openRide.endLng ?? null,
         };
-        store.updateRide(closed);
+        await store.updateRide(closed);
       }
 
       const rideId = crypto.randomUUID();
       const newRide: Ride = {
         id: rideId,
         userId,
+        participantIds,
         startKm: kmValue,
         startedAt: new Date().toISOString(),
         endKm: null,
@@ -109,7 +126,7 @@ export function RidePage() {
         endLng: null,
       };
 
-      store.addRide(newRide);
+      await store.addRide(newRide);
 
       navigate("/", {
         state: {
@@ -119,69 +136,57 @@ export function RidePage() {
           },
         },
       });
-    } else {
-      // stop mode
-      const open = openRideForUser;
-      if (!open) {
-        setError("No open ride found for this user.");
-        return;
-      }
-      if (kmValue <= open.startKm) {
-        setError(
-          `End km must be greater than the ride's start km (${open.startKm}).`
-        );
-        return;
-      }
 
-      const finalizeStop = (coords?: GeolocationCoordinates | null) => {
-        const updatedRide: Ride = {
-          ...open,
-          endKm: kmValue,
-          endedAt: new Date().toISOString(),
-          endLat: coords
-            ? coords.latitude
-            : open.endLat ?? null,
-          endLng: coords
-            ? coords.longitude
-            : open.endLng ?? null,
-        };
+      return;
+    }
 
-        store.updateRide(updatedRide);
+    // mode === "stop"
+    if (!openRide) {
+      setError("No open ride found.");
+      return;
+    }
 
-        navigate("/", {
-          state: {
-            notification: {
-              type: "success",
-              message: `Ride stopped. Distance: ${
-                kmValue - open.startKm
-              } km.`,
-            },
-          },
-        });
+    if (kmValue <= openRide.startKm) {
+      setError(
+        `End km must be greater than the ride's start km (${openRide.startKm}).`
+      );
+      return;
+    }
+
+    const finalizeStop = async (coords?: GeolocationCoordinates | null) => {
+      const updated: Ride = {
+        ...openRide,
+        endKm: kmValue,
+        endedAt: new Date().toISOString(),
+        endLat: coords ? coords.latitude : openRide.endLat ?? null,
+        endLng: coords ? coords.longitude : openRide.endLng ?? null,
       };
 
-      // 👉 Here we "offer" to save location when stopping
-      if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            // User allowed / success: store car location
-            finalizeStop(pos.coords);
+      await store.updateRide(updated);
+
+      navigate("/", {
+        state: {
+          notification: {
+            type: "success",
+            message: `Ride stopped. Distance: ${kmValue - openRide.startKm} km.`,
           },
-          (err) => {
-            console.error("Geolocation error on stop:", err);
-            // Permission denied or error: still stop ride, just without new location
-            finalizeStop(null);
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 8000,
-            maximumAge: 0,
-          }
-        );
-      } else {
-        // Browser does not support geolocation → just stop ride
-        finalizeStop(null);
-      }
+        },
+      });
+    };
+
+    // Offer to store location automatically on stop
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          void finalizeStop(pos.coords);
+        },
+        () => {
+          void finalizeStop(null);
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      );
+    } else {
+      await finalizeStop(null);
     }
   }
 
@@ -189,40 +194,74 @@ export function RidePage() {
 
   return (
     <div className="page">
-      <PageHeader title={title} />   {/* 👈 replaces <header className="page-header">... */}
+      <PageHeader title={title} />
 
-    {error && (
-      <InlineNotification type="error" onClose={() => setError(null)}>
-        {error}
-      </InlineNotification>
-    )}
+      {error && (
+        <InlineNotification type="error" onClose={() => setError(null)}>
+          {error}
+        </InlineNotification>
+      )}
 
       <Card>
-        <UserPicker
-          users={USERS}
-          value={userId}
-          onChange={setUserId}
-          label="Who are you?"
-        />
+        {mode === "start" && (
+          <>
+          
 
-        {mode === "start" && lastRide && lastRide.endKm == null && (
+            <div className="field">
+              <span className="field-label">Participants</span>
+              <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                {USERS.map((u) => {
+                  const checked = participantIds.includes(u.id);
+                  return (
+                    <label
+                      key={u.id}
+                      style={{
+                        display: "flex",
+                        gap: 10,
+                        alignItems: "center",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setParticipantIds((prev) =>
+                            prev.includes(u.id)
+                              ? prev.filter((x) => x !== u.id)
+                              : [...prev, u.id]
+                          );
+                        }}
+                      />
+                      <span>{u.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="hint" style={{ marginTop: 6 }}>
+                Costs and wear will be split equally among participants.
+              </p>
+            </div>
+          </>
+        )}
+
+        {mode === "stop" && (
           <div className="banner-warning">
-            {lastRideUser ? (
+            {openRide ? (
               <>
-                User <strong>{lastRideUser.name}</strong> still has an open
-                ride starting at km <strong>{lastRide.startKm}</strong>. <br />
-                By entering the <strong>current km</strong> and starting your
-                ride, you will{" "}
+                Current ride started at km <strong>{openRide.startKm}</strong>{" "}
+                with <strong>{openRide.participantIds.length}</strong>{" "}
+                participant(s):{" "}
                 <strong>
-                  stop their ride and start a new one for you
+                  {openRide.participantIds
+                    .map((id) => USERS.find((u) => u.id === id)?.name ?? id)
+                    .join(", ")}
                 </strong>
                 .
+                <br />
+                Anyone can stop this ride by entering the current km.
               </>
             ) : (
-              <>
-                The previous ride was not finished. Enter the{" "}
-                <strong>current km</strong> to close it and start your ride.
-              </>
+              <>There is currently no open ride.</>
             )}
           </div>
         )}
@@ -253,13 +292,6 @@ export function RidePage() {
         {mode === "start" && lastKnownKm !== undefined && (
           <p className="hint">
             Last known km: <strong>{lastKnownKm}</strong>
-          </p>
-        )}
-
-        {mode === "stop" && openRideForUser && (
-          <p className="hint">
-            This ride started at km{" "}
-            <strong>{openRideForUser.startKm}</strong>.
           </p>
         )}
 

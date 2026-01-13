@@ -4,7 +4,7 @@ import { USERS } from "../types";
 import type { UserId } from "../types";
 import { Card } from "../components/Card";
 import { PageHeader } from "../components/PageHeader";
-
+import { computeKmByUser } from "../utils/rideShares";
 
 interface UserSummary {
   userId: UserId;
@@ -27,14 +27,8 @@ export function SettlePage() {
   }, []);
 
   const totalKmByUser = useMemo(() => {
-    const map: Record<UserId, number> = {};
-    for (const r of state.rides) {
-      if (r.endKm == null) continue;
-      const d = r.endKm - r.startKm;
-      if (d <= 0) continue;
-      map[r.userId] = (map[r.userId] || 0) + d;
-    }
-    return map;
+    const allIds = USERS.map((u) => u.id);
+    return computeKmByUser(state.rides, allIds);
   }, [state.rides]);
 
   const totalKmOverall = useMemo(
@@ -49,19 +43,18 @@ export function SettlePage() {
 
   const summaries: UserSummary[] = useMemo(() => {
     return USERS.map((u) => {
-      const km = totalKmByUser[u.id] || 0;
+      const km = totalKmByUser[u.id] ?? 0;
 
       const variablePaid = state.costs
         .filter((c) => c.userId === u.id)
         .reduce((sum, c) => sum + c.amount, 0);
 
       const variableShare =
-        totalKmOverall > 0
-          ? (totalVariableCosts * km) / totalKmOverall
-          : 0;
+        totalKmOverall > 0 ? (totalVariableCosts * km) / totalKmOverall : 0;
 
       const variableNet = variablePaid - variableShare;
 
+      // Wear is based on km share too
       const wearOwed = km * state.config.wearRatePerKm;
 
       const wearPaid = state.wearPayments
@@ -82,7 +75,14 @@ export function SettlePage() {
         wearNet,
       };
     });
-  }, [state.costs, state.wearPayments, state.config, totalKmByUser, totalKmOverall]);
+  }, [
+    state.costs,
+    state.wearPayments,
+    state.config.wearRatePerKm,
+    totalKmByUser,
+    totalKmOverall,
+    totalVariableCosts,
+  ]);
 
   function formatAmount(n: number): string {
     return n.toFixed(2);
@@ -95,9 +95,10 @@ export function SettlePage() {
       {summaries.map((s) => (
         <Card key={s.userId}>
           <h2>{s.name}</h2>
+
           <div className="stat-row">
             <span>Total km driven</span>
-            <strong>{s.km} km</strong>
+            <strong>{s.km.toFixed(2)} km</strong>
           </div>
 
           <hr className="divider" />

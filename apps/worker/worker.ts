@@ -10,13 +10,15 @@ type CostType = "FUEL" | "INSURANCE" | "OTHER";
 interface Ride {
   id: string;
   userId: string;
+  participantIds: string; // JSON text in DB (e.g. '["jeroen","stijn"]')
   startKm: number;
   endKm: number | null;
   startedAt: string;
   endedAt: string | null;
-  endLat?: number | null;  
-  endLng?: number | null;  
+  endLat?: number | null;
+  endLng?: number | null;
 }
+
 
 
 interface CostEvent {
@@ -103,8 +105,9 @@ export default {
 
 async function handleState(env: Env): Promise<Response> {
   const ridesRes = await env.DB.prepare(
-    "SELECT id, userId, startKm, endKm, startedAt, endedAt, endLat, endLng FROM rides"
+    "SELECT id, userId, participantIds, startKm, endKm, startedAt, endedAt, endLat, endLng FROM rides"
   ).all<Ride>();
+  
   
 
   const costsRes = await env.DB.prepare(
@@ -141,16 +144,17 @@ async function handleCreateRide(request: Request, env: Env): Promise<Response> {
   const body = (await request.json()) as {
     id: string;
     userId: string;
+    participantIds: string[]; // from frontend
     startKm: number;
     startedAt: string;
   };
-
+  
   await env.DB.prepare(
-    "INSERT INTO rides (id, userId, startKm, startedAt) VALUES (?, ?, ?, ?)"
+    "INSERT INTO rides (id, userId, participantIds, startKm, startedAt) VALUES (?, ?, ?, ?, ?)"
   )
-    .bind(body.id, body.userId, body.startKm, body.startedAt)
+    .bind(body.id, body.userId, JSON.stringify(body.participantIds), body.startKm, body.startedAt)
     .run();
-
+  
   return json({ ok: true });
 }
 
@@ -161,29 +165,31 @@ async function handleUpdateRide(
 ): Promise<Response> {
   const body = (await request.json()) as {
     userId: string;
+    participantIds: string[];
     startKm: number;
     endKm?: number | null;
     startedAt: string;
     endedAt?: string | null;
-    endLat?: number | null;   // 👈 new
-    endLng?: number | null;   // 👈 new
+    endLat?: number | null;
+    endLng?: number | null;
   };
-
+  
   await env.DB.prepare(
-    "UPDATE rides SET userId = ?, startKm = ?, endKm = ?, startedAt = ?, endedAt = ?, endLat = ?, endLng = ? WHERE id = ?"
+    "UPDATE rides SET userId = ?, participantIds = ?, startKm = ?, endKm = ?, startedAt = ?, endedAt = ?, endLat = ?, endLng = ? WHERE id = ?"
   )
     .bind(
       body.userId,
+      JSON.stringify(body.participantIds),
       body.startKm,
       body.endKm ?? null,
       body.startedAt,
       body.endedAt ?? null,
-      body.endLat ?? null,     // 👈 new
-      body.endLng ?? null,     // 👈 new
+      body.endLat ?? null,
+      body.endLng ?? null,
       id
     )
     .run();
-
+  
   return json({ ok: true });
 }
 
