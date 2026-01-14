@@ -5,8 +5,8 @@ compatibility_date = "2024-05-01"
 # Default (dev/test) D1 binding
 [[d1_databases]]
 binding = "DB"
-database_name = "up_for_a_ride_db"
-database_id = "7a37a2c9-5548-483c-9527-845dc79d08c4"
+database_name = "up-for-a-ride"
+database_id = "d55a8f57-b9cf-415d-8ced-b372ce6ba896"
 
 [vars]
 OCR_SPACE_API_KEY = "YK82567465988957"
@@ -14,3 +14,7 @@ OCR_SPACE_API_KEY = "YK82567465988957"
 [dev]
 port = 8787
 local_protocol = "http"
+
+
+[env.production.vars]
+OCR_SPACE_API_KEY = "YK82567465988957"
