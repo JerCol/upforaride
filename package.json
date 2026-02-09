@@ -7,9 +7,7 @@
     "apps/worker"
   ],
   "scripts": {
-    "dev": "wrangler dev --local",
-    "deploy": "wrangler deploy",
-    "migrate": "wrangler d1 migrations apply up_for_a_ride_db"
+    "dev": "wrangler dev --env preview --remote"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20251115.0"
