@@ -1,0 +1,27 @@
+{
+	"name": "up-for-a-ride",
+	"main": "apps/worker/worker.ts",
+	"compatibility_date": "2024-05-01",
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "up-for-a-ride-prod",
+			"database_id": "50b1e328-b7ed-4e3d-806d-68eb1e64bf95"
+		}
+	],
+	"env": {
+		"preview": {
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "up-for-a-ride-dev",
+					"database_id": "2f09bc9d-45b2-42da-9bb6-99315ee54466"
+				}
+			]
+		}
+	},
+	"dev": {
+		"port": 8787,
+		"local_protocol": "http"
+	}
+}
